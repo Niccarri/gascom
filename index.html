@@ -6,18 +6,19 @@
   <title>GASCOM</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- PWA / Icons (Flask static) -->
-  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-  <meta name="theme-color" content="#222222">
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#111111">
 
   <!-- iOS -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="GASCOM">
-  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 
-  <!-- Android/Chrome icon fallback -->
-  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+  <!-- Icons fallback -->
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
 
   <style>
     body {
@@ -166,13 +167,9 @@
   </main>
 
   <script>
-    // Mejor nombre de storage (no “quinta”)
     const STORAGE_KEY = "gascom_gastos_v1";
 
-    let data = {
-      integrantes: [],
-      pagos: []
-    };
+    let data = { integrantes: [], pagos: [] };
 
     const cap = (s) => {
       s = (s || "").trim();
@@ -203,7 +200,6 @@
       renderGastos();
     }
 
-    // --- Integrantes ---
     function renderIntegrantes() {
       const cont = document.getElementById("listaIntegrantes");
       if (data.integrantes.length === 0) {
@@ -231,10 +227,7 @@
       const nombre = cap(input.value);
       if (!nombre) return;
 
-      if (data.integrantes.includes(nombre)) {
-        alert("Ese integrante ya existe.");
-        return;
-      }
+      if (data.integrantes.includes(nombre)) return alert("Ese integrante ya existe.");
 
       data.integrantes.push(nombre);
       input.value = "";
@@ -242,7 +235,6 @@
       actualizarUI();
     });
 
-    // --- Pagos ---
     document.getElementById("btnRegistrarPago").addEventListener("click", () => {
       const persona = document.getElementById("pagoPersona").value;
       const montoStr = document.getElementById("pagoMonto").value;
@@ -287,7 +279,6 @@
       cont.innerHTML = html;
     }
 
-    // --- Resumen y transferencias ---
     document.getElementById("btnCalcular").addEventListener("click", calcularResumen);
 
     function calcularResumen() {
@@ -354,7 +345,6 @@
       transferDiv.innerHTML = htmlTrans;
     }
 
-    // Reset total (confirmación fuerte)
     document.getElementById("btnReset").addEventListener("click", () => {
       const ok = prompt('Para borrar todo escribí: BORRAR');
       if ((ok || "").trim().toUpperCase() !== "BORRAR") return;
@@ -366,7 +356,6 @@
       document.getElementById("transferencias").innerHTML = "";
     });
 
-    // Mercado Pago
     function abrirMP() {
       window.location.href = "mercadopago://";
       setTimeout(() => {
@@ -374,16 +363,15 @@
       }, 1200);
     }
 
-    // Inicializar
     cargarDesdeStorage();
     actualizarUI();
   </script>
 
-  <!-- Service Worker (Flask static) -->
+  <!-- Service Worker (GitHub Pages) -->
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}");
+        navigator.serviceWorker.register("./service-worker.js");
       });
     }
   </script>

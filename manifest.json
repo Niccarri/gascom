@@ -1,22 +1,25 @@
 {
   "name": "GASCOM",
   "short_name": "GASCOM",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#f5f5f5",
-  "theme_color": "#222222",
-  "description": "Gastos compartidos compartidos, claros y sin vueltas.",
+  "orientation": "portrait",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "description": "Gastos compartidos, claros y sin vueltas.",
   "icons": [
     {
-      "src": "/static/icons/icon-192.png",
+      "src": "icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
-      "src": "/static/icons/icon-512.png",
+      "src": "icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

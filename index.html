@@ -1,0 +1,391 @@
+<!-- creador @NICCARRI -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>GASCOM</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- PWA / Icons (Flask static) -->
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#222222">
+
+  <!-- iOS -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GASCOM">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+
+  <!-- Android/Chrome icon fallback -->
+  <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icons/icon-192.png') }}">
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+      color: #222;
+    }
+    header {
+      background: #222;
+      color: #fff;
+      padding: 1rem;
+      text-align: center;
+    }
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    h2 { margin-top: 1.5rem; margin-bottom: 0.5rem; }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    label { display:block; margin-bottom:0.25rem; font-size:0.9rem; }
+    input, select, button, textarea {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      box-sizing: border-box;
+    }
+    button {
+      cursor: pointer;
+      background: #1976d2;
+      color: white;
+      border: none;
+      font-weight: 600;
+    }
+    button.secondary { background:#9e9e9e; }
+    button.danger { background:#d32f2f; }
+    button:disabled { opacity:0.6; cursor:default; }
+    .row { display:flex; gap:0.5rem; flex-wrap:wrap; }
+    .row > div { flex:1; min-width:130px; }
+    table { width:100%; border-collapse:collapse; margin-top:0.5rem; font-size:0.95rem; }
+    th, td { border:1px solid #ddd; padding:0.4rem 0.5rem; text-align:left; }
+    th { background:#f0f0f0; }
+    .small { font-size:0.8rem; color:#666; }
+    .flex-between {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:0.5rem;
+      flex-wrap:wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>GASCOM</h1>
+    <div class="small">Cálculo de gastos compartidos entre amigos</div>
+  </header>
+
+  <main>
+    <!-- Integrantes -->
+    <section class="card">
+      <div class="flex-between">
+        <h2>Integrantes</h2>
+        <button id="btnReset" class="danger" type="button">Borrar todo y empezar de cero</button>
+      </div>
+
+      <div class="row">
+        <div>
+          <label for="nuevoIntegrante">Nombre del integrante</label>
+          <input id="nuevoIntegrante" type="text" placeholder="Ej: Nico" />
+        </div>
+        <div style="align-self:flex-end;">
+          <button id="btnAgregarIntegrante" type="button">Agregar integrante</button>
+        </div>
+      </div>
+
+      <div id="listaIntegrantes" class="small"></div>
+    </section>
+
+    <!-- Registrar gastos -->
+    <section class="card">
+      <h2>Registrar gasto</h2>
+      <div class="row">
+        <div>
+          <label for="pagoPersona">Quién pagó</label>
+          <select id="pagoPersona">
+            <option value="">Elegí un integrante</option>
+          </select>
+        </div>
+        <div>
+          <label for="pagoMonto">Monto</label>
+          <input id="pagoMonto" type="number" step="0.01" min="0" placeholder="Ej: 35000" />
+        </div>
+      </div>
+
+      <label for="pagoDescripcion">Descripción</label>
+      <input id="pagoDescripcion" type="text" placeholder="Ej: reserva, carne, bebida" />
+
+      <button id="btnRegistrarPago" type="button">Registrar pago</button>
+      <div class="small">Ejemplo: "Seba pagó 35000 por la carne".</div>
+    </section>
+
+    <!-- Lista de gastos -->
+    <section class="card">
+      <h2>Gastos registrados</h2>
+      <div id="tablaGastos"></div>
+    </section>
+
+    <!-- Resumen -->
+    <section class="card">
+      <h2>Resumen y transferencias</h2>
+      <button id="btnCalcular" type="button">Calcular resumen</button>
+      <div id="resumen"></div>
+      <div id="transferencias"></div>
+    </section>
+
+    <!-- Mercado Pago -->
+    <section class="card">
+      <h2>Pagos</h2>
+      <div class="small">Esto no cobra ni procesa pagos: solo abre Mercado Pago para que transfieran.</div>
+      <button onclick="abrirMP()" style="
+          background-color:#009ee3;
+          color:white;
+          padding:15px 30px;
+          border:none;
+          border-radius:8px;
+          font-size:18px;
+          font-weight:bold;
+          cursor:pointer;
+      ">
+          💳 Abrir Mercado Pago
+      </button>
+    </section>
+  </main>
+
+  <script>
+    // Mejor nombre de storage (no “quinta”)
+    const STORAGE_KEY = "gascom_gastos_v1";
+
+    let data = {
+      integrantes: [],
+      pagos: []
+    };
+
+    const cap = (s) => {
+      s = (s || "").trim();
+      if (!s) return "";
+      return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    };
+
+    function cargarDesdeStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.integrantes) && Array.isArray(parsed.pagos)) {
+          data = parsed;
+        }
+      } catch (e) {
+        console.error("Error leyendo storage", e);
+      }
+    }
+
+    function guardarEnStorage() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function actualizarUI() {
+      renderIntegrantes();
+      renderSelectIntegrantes();
+      renderGastos();
+    }
+
+    // --- Integrantes ---
+    function renderIntegrantes() {
+      const cont = document.getElementById("listaIntegrantes");
+      if (data.integrantes.length === 0) {
+        cont.textContent = "No hay integrantes cargados.";
+        return;
+      }
+      cont.textContent = "Integrantes: " + data.integrantes.join(", ");
+    }
+
+    function renderSelectIntegrantes() {
+      const sel = document.getElementById("pagoPersona");
+      const current = sel.value;
+      sel.innerHTML = '<option value="">Elegí un integrante</option>';
+      data.integrantes.forEach(nombre => {
+        const opt = document.createElement("option");
+        opt.value = nombre;
+        opt.textContent = nombre;
+        sel.appendChild(opt);
+      });
+      if (data.integrantes.includes(current)) sel.value = current;
+    }
+
+    document.getElementById("btnAgregarIntegrante").addEventListener("click", () => {
+      const input = document.getElementById("nuevoIntegrante");
+      const nombre = cap(input.value);
+      if (!nombre) return;
+
+      if (data.integrantes.includes(nombre)) {
+        alert("Ese integrante ya existe.");
+        return;
+      }
+
+      data.integrantes.push(nombre);
+      input.value = "";
+      guardarEnStorage();
+      actualizarUI();
+    });
+
+    // --- Pagos ---
+    document.getElementById("btnRegistrarPago").addEventListener("click", () => {
+      const persona = document.getElementById("pagoPersona").value;
+      const montoStr = document.getElementById("pagoMonto").value;
+      const desc = (document.getElementById("pagoDescripcion").value || "").trim().slice(0, 120);
+
+      if (!persona) return alert("Seleccioná quién pagó.");
+
+      const monto = parseFloat(montoStr);
+      if (isNaN(monto) || monto <= 0) return alert("Ingresá un monto válido mayor que 0.");
+
+      data.pagos.push({
+        persona,
+        monto: Math.round(monto * 100) / 100,
+        descripcion: desc || "sin descripción"
+      });
+
+      document.getElementById("pagoMonto").value = "";
+      document.getElementById("pagoDescripcion").value = "";
+
+      guardarEnStorage();
+      actualizarUI();
+    });
+
+    function renderGastos() {
+      const cont = document.getElementById("tablaGastos");
+      if (data.pagos.length === 0) {
+        cont.innerHTML = "<p>No hay gastos cargados.</p>";
+        return;
+      }
+      let total = 0;
+      let html = "<table><thead><tr><th>#</th><th>Persona</th><th>Monto</th><th>Descripción</th></tr></thead><tbody>";
+      data.pagos.forEach((p, i) => {
+        total += p.monto;
+        html += `<tr>
+          <td>${i + 1}</td>
+          <td>${p.persona}</td>
+          <td>$${p.monto.toFixed(2)}</td>
+          <td>${p.descripcion}</td>
+        </tr>`;
+      });
+      html += `</tbody></table><p><strong>Total gastado:</strong> $${total.toFixed(2)}</p>`;
+      cont.innerHTML = html;
+    }
+
+    // --- Resumen y transferencias ---
+    document.getElementById("btnCalcular").addEventListener("click", calcularResumen);
+
+    function calcularResumen() {
+      const resumenDiv = document.getElementById("resumen");
+      const transferDiv = document.getElementById("transferencias");
+      resumenDiv.innerHTML = "";
+      transferDiv.innerHTML = "";
+
+      if (data.integrantes.length === 0) return (resumenDiv.textContent = "No hay integrantes cargados.");
+      if (data.pagos.length === 0) return (resumenDiv.textContent = "No hay pagos cargados.");
+
+      const total = data.pagos.reduce((acc, p) => acc + p.monto, 0);
+      const n = data.integrantes.length;
+      const parte = total / n;
+
+      const aporta = {};
+      data.integrantes.forEach(nombre => aporta[nombre] = 0);
+      data.pagos.forEach(p => { aporta[p.persona] = (aporta[p.persona] || 0) + p.monto; });
+
+      let htmlResumen = `<p><strong>Personas:</strong> ${n}</p>`;
+      htmlResumen += `<p><strong>Gasto total:</strong> $${total.toFixed(2)}</p>`;
+      htmlResumen += `<p><strong>Le corresponde a cada uno:</strong> $${parte.toFixed(2)}</p>`;
+
+      htmlResumen += "<h3>Saldos por persona</h3><ul>";
+      const saldos = {};
+      data.integrantes.forEach(nombre => {
+        const saldo = (aporta[nombre] || 0) - parte;
+        saldos[nombre] = saldo;
+        if (saldo > 0.01) htmlResumen += `<li>${nombre}: tiene a favor $${saldo.toFixed(2)}</li>`;
+        else if (saldo < -0.01) htmlResumen += `<li>${nombre}: debe $${(-saldo).toFixed(2)}</li>`;
+        else htmlResumen += `<li>${nombre}: en equilibrio</li>`;
+      });
+      htmlResumen += "</ul>";
+      resumenDiv.innerHTML = htmlResumen;
+
+      const deudores = [];
+      const acreedores = [];
+      for (const [nombre, saldo] of Object.entries(saldos)) {
+        if (saldo < -0.01) deudores.push({ nombre, monto: -saldo });
+        else if (saldo > 0.01) acreedores.push({ nombre, monto: saldo });
+      }
+
+      if (deudores.length === 0 || acreedores.length === 0) {
+        transferDiv.innerHTML = "<p>No se requieren transferencias entre personas.</p>";
+        return;
+      }
+
+      let htmlTrans = "<h3>Transferencias sugeridas</h3><ul>";
+      let i = 0, j = 0;
+      while (i < deudores.length && j < acreedores.length) {
+        const deudor = deudores[i];
+        const acreedor = acreedores[j];
+        const pago = Math.min(deudor.monto, acreedor.monto);
+
+        htmlTrans += `<li>${deudor.nombre} le paga a ${acreedor.nombre}: $${pago.toFixed(2)}</li>`;
+
+        deudor.monto -= pago;
+        acreedor.monto -= pago;
+
+        if (deudor.monto <= 0.01) i++;
+        if (acreedor.monto <= 0.01) j++;
+      }
+      htmlTrans += "</ul><p>Con estas transferencias se equilibran todas las cuentas.</p>";
+      transferDiv.innerHTML = htmlTrans;
+    }
+
+    // Reset total (confirmación fuerte)
+    document.getElementById("btnReset").addEventListener("click", () => {
+      const ok = prompt('Para borrar todo escribí: BORRAR');
+      if ((ok || "").trim().toUpperCase() !== "BORRAR") return;
+
+      data = { integrantes: [], pagos: [] };
+      localStorage.removeItem(STORAGE_KEY);
+      actualizarUI();
+      document.getElementById("resumen").innerHTML = "";
+      document.getElementById("transferencias").innerHTML = "";
+    });
+
+    // Mercado Pago
+    function abrirMP() {
+      window.location.href = "mercadopago://";
+      setTimeout(() => {
+        window.location.href = "https://www.mercadopago.com.ar/";
+      }, 1200);
+    }
+
+    // Inicializar
+    cargarDesdeStorage();
+    actualizarUI();
+  </script>
+
+  <!-- Service Worker (Flask static) -->
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("{{ url_for('static', filename='service-worker.js') }}");
+      });
+    }
+  </script>
+</body>
+</html>
